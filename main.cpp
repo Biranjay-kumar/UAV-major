@@ -3,143 +3,66 @@
 #include <string>
 #include "UAV.h"
 #include "Task.h"
-#include "Scheduler.h"
+#include "SwarmOptimizer.h"
 
-void displayPriorityOptions() {
-    std::cout << "\nSelect Priority Calculation Method:\n";
-    std::cout << "1. Default Priority (Weighted combination of all factors)\n";
-    std::cout << "2. Time-Critical Priority (Focus on time urgency and deadlines)\n";
-    std::cout << "3. Risk-Based Priority (Focus on risk factors and task types)\n";
-    std::cout << "4. Impact-Based Priority (Focus on population and area impact)\n";
-    std::cout << "5. Custom Priority (Enter your own weights)\n";
-    std::cout << "Enter your choice (1-5): ";
-}
+int main() {
+    try {
+        // Input UAVs
+        int numUAVs;
+        std::cout << "Enter number of UAVs: ";
+        std::cin >> numUAVs;
+        if (numUAVs <= 0) throw std::invalid_argument("Number of UAVs must be positive.");
 
-void getCustomWeights(double& timeUrgencyWeight, double& riskFactorWeight, 
-                     double& impactFactorWeight, double& timeSensitiveWeight,
-                     double& taskTypeWeight, double& taskAgeWeight) {
-    std::cout << "\nEnter custom weights for each factor (must sum to 1.0):\n";
-    
-    std::cout << "Time Urgency Weight (0-1): ";
-    std::cin >> timeUrgencyWeight;
-    
-    std::cout << "Risk Factor Weight (0-1): ";
-    std::cin >> riskFactorWeight;
-    
-    std::cout << "Impact Factor Weight (0-1): ";
-    std::cin >> impactFactorWeight;
-    
-    std::cout << "Time Sensitive Weight (0-1): ";
-    std::cin >> timeSensitiveWeight;
-    
-    std::cout << "Task Type Weight (0-1): ";
-    std::cin >> taskTypeWeight;
-    
-    std::cout << "Task Age Weight (0-1): ";
-    std::cin >> taskAgeWeight;
-    
-    // Validate the sum is 1.0
-    double total = timeUrgencyWeight + riskFactorWeight + impactFactorWeight +
-                  timeSensitiveWeight + taskTypeWeight + taskAgeWeight;
-    
-    if (total != 1.0) {
-        std::cout << "Warning: Weights don't sum to 1.0. Normalizing weights...\n";
-        timeUrgencyWeight /= total;
-        riskFactorWeight /= total;
-        impactFactorWeight /= total;
-        timeSensitiveWeight /= total;
-        taskTypeWeight /= total;
-        taskAgeWeight /= total;
-    }
-}
-
-int main()
-{
-    int numUAVs, numTasks;
-    int priorityChoice;
-
-    std::cout << "Enter number of UAVs: ";
-    std::cin >> numUAVs;
-
-    std::vector<UAV> uavs;
-for (int i = 0; i < numUAVs; ++i)
-{
-    int id;
-    double x, y, fuel, speed;
-    
-    std::cout << "\nEnter details for UAV " << i + 1 << ":\n";
-    std::cout << "ID: "; std::cin >> id;
-    std::cout << "Initial X coordinate: "; std::cin >> x;
-    std::cout << "Initial Y coordinate: "; std::cin >> y;
-    std::cout << "Fuel Level: "; std::cin >> fuel;
-    
-    do {
-        std::cout << "Speed (units per minute, must be > 0): ";
-        std::cin >> speed;
-        if (speed <= 0) {
-            std::cout << "Invalid speed! Must be positive.\n";
+        std::vector<UAV> uavs;
+        for (int i = 0; i < numUAVs; ++i) {
+            int id; double x, y, fuel, speed;
+            std::cout << "\nUAV " << i + 1 << " ID, X, Y, Fuel, Speed: ";
+            std::cin >> id >> x >> y >> fuel >> speed;
+            if (fuel <= 0 || speed <= 0) throw std::invalid_argument("Fuel/speed must be positive.");
+            uavs.emplace_back(id, x, y, fuel, speed);
         }
-    } while (speed <= 0);
-    
-    uavs.emplace_back(id, x, y, fuel, speed);
-}
 
-    std::cout << "\nEnter number of Tasks: ";
-    std::cin >> numTasks;
+        // Input Tasks
+        int numTasks;
+        std::cout << "Enter number of Tasks: ";
+        std::cin >> numTasks;
+        if (numTasks <= 0) throw std::invalid_argument("Number of tasks must be positive.");
 
-    std::vector<Task> tasks;
-    for (int i = 0; i < numTasks; ++i)
-    {
-        int id, age;
-        double x, y, timeLeft;
-        std::string taskType, area, population;
+        std::vector<Task> tasks;
+        for (int i = 0; i < numTasks; ++i) {
+            int id, age; double x, y, timeLeft;
+            std::string type, area, pop;
+            std::cout << "\nTask " << i + 1 << " ID, X, Y, TimeLeft, Type, Area, Pop, Age: ";
+            std::cin >> id >> x >> y >> timeLeft >> type >> area >> pop >> age;
+            tasks.emplace_back(id, x, y, timeLeft, type, area, pop, age);
+        }
 
-        std::cout << "\nEnter details for Task " << i + 1 << ":\n";
-        std::cout << "ID: "; std::cin >> id;
-        std::cout << "X Y: "; std::cin >> x >> y;
-        std::cout << "Time Left (in minutes): "; std::cin >> timeLeft;
-        std::cout << "Task Type: "; std::cin >> taskType;
-        std::cout << "Area: "; std::cin >> area;
-        std::cout << "Population (low/high): "; std::cin >> population;
-        std::cout << "Age of Task (in minutes): "; std::cin >> age;
+        // Configure PSO
+        int swarmSize, maxIters;
+        std::cout << "Enter swarm size (default: " << numUAVs * 10 << "): ";
+        std::cin >> swarmSize;
+        if (swarmSize <= 0) swarmSize = numUAVs * 10;
 
-        tasks.emplace_back(id, x, y, timeLeft, taskType, area, population, age);
+        std::cout << "Enter max iterations (default: 100): ";
+        std::cin >> maxIters;
+        if (maxIters <= 0) maxIters = 100;
+
+        // Run PSO
+        SwarmOptimizer optimizer(uavs, tasks, swarmSize, maxIters);
+        optimizer.run();
+
+        // Print results
+        std::cout << "\n=== Optimal Assignment ===\n";
+        const auto& bestAssign = optimizer.getBestAssignment();
+        for (int t = 0; t < numTasks; ++t) {
+            std::cout << "Task " << t << " → UAV " << bestAssign[t] << "\n";
+        }
+        std::cout << "Total cost: " << optimizer.getBestFitness() << "\n";
+
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 1;
     }
-    for (auto& uav : uavs) {
-        uav.update();  // Check for task completion
-    }
-    // Priority selection
-    displayPriorityOptions();
-    std::cin >> priorityChoice;
-
-    // Set priority calculation method based on user choice
-    switch(priorityChoice) {
-        case 1: // Default
-            Task::setPriorityWeights(0.25, 0.2, 0.2, 0.15, 0.1, 0.1);
-            break;
-        case 2: // Time-Critical
-            Task::setPriorityWeights(0.5, 0.15, 0.1, 0.15, 0.05, 0.05);
-            break;
-        case 3: // Risk-Based
-            Task::setPriorityWeights(0.1, 0.4, 0.2, 0.1, 0.15, 0.05);
-            break;
-        case 4: // Impact-Based
-            Task::setPriorityWeights(0.15, 0.15, 0.4, 0.1, 0.1, 0.1);
-            break;
-        case 5: // Custom
-            {
-                double tu, rf, imp, ts, tt, ta;
-                getCustomWeights(tu, rf, imp, ts, tt, ta);
-                Task::setPriorityWeights(tu, rf, imp, ts, tt, ta);
-            }
-            break;
-        default:
-            std::cout << "Invalid choice. Using default priority calculation.\n";
-            Task::setPriorityWeights(0.25, 0.2, 0.2, 0.15, 0.1, 0.1);
-    }
-
-    Scheduler scheduler(numUAVs, numTasks);
-    scheduler.assignTasks(uavs, tasks);
 
     return 0;
 }

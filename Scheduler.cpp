@@ -71,8 +71,8 @@ void Scheduler::assignTasks(std::vector<UAV> &uavs, std::vector<Task> &tasks)
 
         // Assign the selected task to the UAV
         uavs[i].assignTask(selectedTask);
-        std::cout << "Assigned Task ID " << selectedTask.getId()
-                  << " to UAV ID " << uavs[i].getId() << std::endl;
+        // std::cout << "Assigned Task ID " << selectedTask.getId()
+        //           << " to UAV ID " << uavs[i].getId() << std::endl;
 
         // Update pheromone levels based on task completion (assuming completion quality or time can affect it)
         double completionQuality = 1.0 / distance(uavs[i], selectedTask);  // Use distance as a simple proxy for quality
